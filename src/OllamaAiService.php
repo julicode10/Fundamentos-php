@@ -21,23 +21,49 @@ class OllamaAiService implements AIServiceInterface
                     'model' => 'deepseek-r1:1.5b',
                     'messages' => [
                         ['role' => 'system', 'content' => <<<EOT
-                            You are a PHP technical assistant. You MUST respond ONLY in Spanish language.
+                            You are a specialized PHP programming language assistant. You MUST respond ONLY in Spanish language and ONLY to PHP-related questions or programming fundamentals applied to PHP.
                             
-                            MANDATORY RULES:
+                            STRICT FILTERING RULES:
+                            - ONLY answer questions about PHP programming language or programming fundamentals explained through PHP
+                            - If the question is NOT about PHP or programming fundamentals with PHP, respond EXACTLY: "Solo respondo consultas sobre PHP."
+                            
+                            TOPICS YOU CAN ANSWER:
+                            - PHP syntax, functions, classes, OOP in PHP
+                            - PHP frameworks (Laravel, Symfony, CodeIgniter)
+                            - Databases with PHP (MySQL, PostgreSQL, etc.)
+                            - PHP best practices and design patterns
+                            - PHP versions and features (PHP 8.x)
+                            - Composer and dependency management
+                            - Programming fundamentals applied to PHP: variables, loops, conditionals, data types, arrays
+                            - Object-oriented programming concepts explained with PHP examples
+                            - Algorithm concepts implemented in PHP
+                            - Data structures using PHP (arrays, objects)
+                            - Programming principles (SOLID, DRY) applied to PHP
+                            - Basic computer science concepts explained through PHP
+                            
+                            TOPICS YOU CANNOT ANSWER:
+                            - Other programming languages (unless comparing with PHP)
+                            - General programming concepts without PHP context
+                            - Non-programming topics
+                            - Personal questions or non-technical topics
+                            
+                            RESPONSE RULES:
                             - Always respond in Spanish (español), never in English
-                            - Keep responses under 100 words
-                            - Be direct and technical
-                            - If not PHP-related, say: "Solo respondo consultas sobre PHP"
-                            - Include code examples when helpful
-                            - Use PHP 8.2+ best practices
+                            - Maximum 100 words for technical answers
+                            - Be direct and practical
+                            - Always include PHP code examples when explaining concepts
+                            - Use PHP 8.2+ syntax and best practices
+                            - Focus on actionable, specific PHP solutions
+                            - When explaining fundamentals, always use PHP syntax and examples
                             
                             RESPONSE FORMAT:
-                            - Direct answers only
-                            - No "thinking out loud"
-                            - Technical information only
-                            - Examples in Spanish comments
+                            - Direct technical answers only
+                            - No introduction phrases
+                            - Code examples with Spanish comments
+                            - Practical PHP implementations
+                            - Always relate fundamentals back to PHP usage
                             
-                            Remember: ALWAYS respond in Spanish language, no exceptions.
+                            IMPORTANT: Before answering, verify the question is about PHP or programming fundamentals that can be explained with PHP. If not, respond with the exact phrase: "Solo respondo consultas sobre PHP."
                             EOT
                         ],
                         ['role' => 'user', 'content' => $question],
@@ -99,8 +125,13 @@ class OllamaAiService implements AIServiceInterface
                 continue;
             }
             
-            // Detectar inicio de respuesta válida en español
-            if (preg_match('/^(PHP es|PHP se|Para|En PHP|Puedes|La respuesta|El código|Un ejemplo|Usa|Utiliza)/i', $cleanLine)) {
+            // Detectar si ya tiene la respuesta correcta para consultas no-PHP
+            if (preg_match('/^Solo respondo consultas sobre PHP\.?$/i', $cleanLine)) {
+                return 'Solo respondo consultas sobre PHP.';
+            }
+            
+            // Detectar inicio de respuesta válida en español sobre PHP o fundamentos
+            if (preg_match('/^(PHP es|PHP se|Para|En PHP|Puedes|La respuesta|El código|Un ejemplo|Usa|Utiliza|function|class|array|\$|Una variable|Un bucle|Una función|Los tipos|Las variables|Un algoritmo|La programación)/i', $cleanLine)) {
                 $inThinkingBlock = false;
                 $foundValidContent = true;
                 $cleanLines[] = $cleanLine;
@@ -131,6 +162,11 @@ class OllamaAiService implements AIServiceInterface
         $result = preg_replace('/\s+/', ' ', $result);
         $result = trim($result);
         
+        // Verificar si la pregunta no era sobre PHP y el modelo respondió incorrectamente
+        if ($this->isNonPHPResponse($result)) {
+            return 'Solo respondo consultas sobre PHP.';
+        }
+        
         // Si la respuesta está principalmente en inglés, forzar mensaje en español
         if ($this->isResponseInEnglish($result)) {
             return 'La respuesta se generó en inglés. Por favor, reformula tu pregunta para obtener una respuesta en español.';
@@ -138,15 +174,70 @@ class OllamaAiService implements AIServiceInterface
         
         // Validar que tenemos contenido útil
         if (empty($result) || strlen($result) < 10) {
-            return 'No se pudo obtener una respuesta válida. Por favor, intenta reformular tu pregunta.';
+            return 'No se pudo obtener una respuesta válida. Por favor, intenta reformular tu pregunta sobre PHP.';
         }
         
         // Verificar que la respuesta esté en español y sea coherente
         if (preg_match('/\b(wellformedes|typedef|structs|name \(name\))\b/i', $result)) {
-            return 'La respuesta generada no es coherente. Por favor, intenta con otra pregunta.';
+            return 'La respuesta generada no es coherente. Por favor, intenta con otra pregunta sobre PHP.';
         }
         
         return $result;
+    }
+    
+    /**
+     * Verifica si la respuesta parece ser sobre temas no relacionados con PHP
+     */
+    private function isNonPHPResponse(string $text): bool
+    {
+        $nonPHPKeywords = [
+            'javascript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'rust',
+            'html', 'css', 'react', 'vue', 'angular', 'node.js', 'typescript',
+            'machine learning', 'inteligencia artificial', 'blockchain',
+            'matemáticas', 'física', 'historia', 'geografía', 'biología'
+        ];
+        
+        // Palabras clave que indican fundamentos de programación válidos cuando se mencionan con PHP
+        $fundamentalsKeywords = [
+            'variable', 'función', 'clase', 'objeto', 'array', 'bucle', 'ciclo',
+            'condicional', 'algoritmo', 'estructura de datos', 'tipo de dato',
+            'programación orientada a objetos', 'oop', 'herencia', 'polimorfismo',
+            'encapsulación', 'abstracción', 'solid', 'dry', 'patrón de diseño'
+        ];
+        
+        $textLower = strtolower($text);
+        
+        // Si contiene palabras de otros lenguajes, no es válido
+        foreach ($nonPHPKeywords as $keyword) {
+            if (strpos($textLower, $keyword) !== false) {
+                return true;
+            }
+        }
+        
+        // Si menciona fundamentos pero también menciona PHP, es válido
+        $mentionsFundamentals = false;
+        foreach ($fundamentalsKeywords as $keyword) {
+            if (strpos($textLower, $keyword) !== false) {
+                $mentionsFundamentals = true;
+                break;
+            }
+        }
+        
+        // Si menciona fundamentos Y menciona PHP, es válido
+        if ($mentionsFundamentals && preg_match('/\bphp\b/i', $text)) {
+            return false;
+        }
+        
+        // Si no menciona PHP en absoluto y es una respuesta larga, probablemente no es sobre PHP
+        if (!preg_match('/\bphp\b/i', $text) && strlen($text) > 50) {
+            // A menos que sea sobre fundamentos explicados con código que parece PHP
+            if (preg_match('/(\$[a-zA-Z_]|function\s+\w+|class\s+\w+|echo\s|print\s)/i', $text)) {
+                return false; // Tiene sintaxis de PHP
+            }
+            return true;
+        }
+        
+        return false;
     }
     
     /**
