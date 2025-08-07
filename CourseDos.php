@@ -1,12 +1,16 @@
 <?php
 
+require 'CourseType.php';
+
 class CourseDos {
 
     public function __construct(
         protected string $title, 
         protected string $subtitle, 
         protected string $description, 
-        protected array $tags
+        protected array $tags,  
+        //type: free, paid
+        protected CourseType $type = CourseType::FREE, // Valor por defecto
         ) {
             // Constructor para inicializar las propiedades del curso
     }
@@ -25,7 +29,8 @@ class CourseDos {
     }
 
     public function __toString(): string {
-        return "Curso: {$this->title}, Descripción: {$this->description}, Etiquetas: " . implode(", ", $this->tags);
+        return "Curso: {$this->title}, Descripción: {$this->description}, Etiquetas: " . implode(", ", $this->tags)
+            . ", Tipo: {$this->type->label()}";
     }
 
     public function addTag(string $tag): void {

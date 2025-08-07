@@ -6,12 +6,9 @@ $course = new CourseDos(
         title: "Curso profesional de PHP",
         subtitle: "Aprende PHP desde cero",
         description: "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Quasi atque quos, rerum ullam quae placeat accusamus eaque incidunt, impedit sit quia repellat magnam consequuntur illum quisquam optio illo. Recusandae, cumque.",
-        tags: ["PHP", "Desarrollo Web", "Programación"]
+        tags: ["PHP", "Desarrollo Web", "Programación"],
+        type: CourseType::PAID // Cambiando el tipo a PAID
     );
-
-$course->addTag("Backend");
-$course->addTag("Bases de Datos");
-$course->addTag("Backend");
 
 ?>
 
