@@ -21,10 +21,23 @@ class OllamaAiService implements AIServiceInterface
                     'model' => 'deepseek-r1:1.5b',
                     'messages' => [
                         ['role' => 'system', 'content' => <<<EOT
-                            Actúa como un asistente técnico enfocado exclusivamente en PHP.
-                            - Tu objetivo es proporcionar respuestas claras, concisas y directamente útiles para desarrolladores, evitando información irrelevante.
-                            - Si la consulta está relacionada con PHP, responde con precisión técnica en menos de 120 palabras, incluyendo ejemplos si son útiles.
-                            - Si la consulta no está relacionada con PHP, responde: "Lo siento, este asistente está diseñado exclusivamente para consultas sobre PHP." ⚙️ Siempre prioriza buenas prácticas, compatibilidad con PHP 8.2+, y contextualiza según CLI, web, u otras tecnologías si se especifican.
+                            You are a PHP technical assistant. You MUST respond ONLY in Spanish language.
+                            
+                            MANDATORY RULES:
+                            - Always respond in Spanish (español), never in English
+                            - Keep responses under 100 words
+                            - Be direct and technical
+                            - If not PHP-related, say: "Solo respondo consultas sobre PHP"
+                            - Include code examples when helpful
+                            - Use PHP 8.2+ best practices
+                            
+                            RESPONSE FORMAT:
+                            - Direct answers only
+                            - No "thinking out loud"
+                            - Technical information only
+                            - Examples in Spanish comments
+                            
+                            Remember: ALWAYS respond in Spanish language, no exceptions.
                             EOT
                         ],
                         ['role' => 'user', 'content' => $question],
@@ -50,45 +63,114 @@ class OllamaAiService implements AIServiceInterface
      */
     private function filterThinking(string $content): string
     {
-        // El pensamiento suele estar entre <think> y </think> o marcadores similares
-        // También puede estar al inicio antes de la respuesta real
-        
-        // Remover bloques de pensamiento entre etiquetas
+        // Remover bloques de pensamiento entre etiquetas XML-style
         $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
         $content = preg_replace('/<thinking>.*?<\/thinking>/s', '', $content);
+        $content = preg_replace('/<thought>.*?<\/thought>/s', '', $content);
         
-        // Remover líneas que indican pensamiento interno
+        // Dividir en líneas para procesamiento línea por línea
         $lines = explode("\n", $content);
-        $filteredLines = [];
-        $skipThinking = false;
+        $cleanLines = [];
+        $inThinkingBlock = false;
+        $foundValidContent = false;
         
         foreach ($lines as $line) {
-            $line = trim($line);
+            $cleanLine = trim($line);
             
-            // Detectar inicio de pensamiento
-            if (preg_match('/^(Let me think|I need to|I should|Let me analyze|First, I|I\'ll)/i', $line)) {
-                $skipThinking = true;
+            // Saltar líneas vacías al inicio
+            if (empty($cleanLine) && !$foundValidContent) {
                 continue;
             }
             
-            // Detectar final de pensamiento y inicio de respuesta
-            if (preg_match('/^(Here\'s|The answer|To|In PHP|For PHP|You can)/i', $line)) {
-                $skipThinking = false;
-                $filteredLines[] = $line;
+            // Detectar patrones de pensamiento en inglés
+            if (preg_match('/^(Let me think|I need to|I should|Let me analyze|First, I|I\'ll|Now I|So I|The user|Looking at|Based on)/i', $cleanLine)) {
+                $inThinkingBlock = true;
                 continue;
             }
             
-            // Si no estamos en modo pensamiento, incluir la línea
-            if (!$skipThinking && !empty($line)) {
-                $filteredLines[] = $line;
+            // Detectar patrones de pensamiento en español
+            if (preg_match('/^(Déjame pensar|Necesito|Debería|Voy a analizar|Primero|El usuario|Mirando|Basándome en)/i', $cleanLine)) {
+                $inThinkingBlock = true;
+                continue;
+            }
+            
+            // Detectar texto incoherente o mezclado
+            if (preg_match('/(name \(name\)|wellformedes|well-formed structures|typedef|structs|unstructureds)/i', $cleanLine)) {
+                continue;
+            }
+            
+            // Detectar inicio de respuesta válida en español
+            if (preg_match('/^(PHP es|PHP se|Para|En PHP|Puedes|La respuesta|El código|Un ejemplo|Usa|Utiliza)/i', $cleanLine)) {
+                $inThinkingBlock = false;
+                $foundValidContent = true;
+                $cleanLines[] = $cleanLine;
+                continue;
+            }
+            
+            // Detectar inicio de respuesta válida en inglés y saltar (forzar español)
+            if (preg_match('/^(Here\'s|The answer|To|In PHP|For PHP|You can|PHP is|The code|Use|You should)/i', $cleanLine)) {
+                $inThinkingBlock = true; // Saltar contenido en inglés
+                continue;
+            }
+            
+            // Si no estamos en bloque de pensamiento, incluir la línea
+            if (!$inThinkingBlock && !empty($cleanLine)) {
+                $foundValidContent = true;
+                $cleanLines[] = $cleanLine;
             }
         }
         
-        $result = implode("\n", $filteredLines);
+        $result = implode("\n", $cleanLines);
         
-        // Limpiar espacios extra
+        // Limpiar texto corrupto adicional
+        $result = preg_replace('/\b(name \(name\)|wellformedes|typedef|structs|unstructureds)\b/i', '', $result);
+        $result = preg_replace('/still the basics are present in both languages\.?/i', '', $result);
+        $result = preg_replace('/¿Qué te sirve\?\s*$/i', '', $result);
+        
+        // Limpiar espacios múltiples y saltos de línea extra
+        $result = preg_replace('/\s+/', ' ', $result);
         $result = trim($result);
         
-        return !empty($result) ? $result : 'No se pudo procesar la respuesta.';
+        // Si la respuesta está principalmente en inglés, forzar mensaje en español
+        if ($this->isResponseInEnglish($result)) {
+            return 'La respuesta se generó en inglés. Por favor, reformula tu pregunta para obtener una respuesta en español.';
+        }
+        
+        // Validar que tenemos contenido útil
+        if (empty($result) || strlen($result) < 10) {
+            return 'No se pudo obtener una respuesta válida. Por favor, intenta reformular tu pregunta.';
+        }
+        
+        // Verificar que la respuesta esté en español y sea coherente
+        if (preg_match('/\b(wellformedes|typedef|structs|name \(name\))\b/i', $result)) {
+            return 'La respuesta generada no es coherente. Por favor, intenta con otra pregunta.';
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Verifica si la respuesta está principalmente en inglés
+     */
+    private function isResponseInEnglish(string $text): bool
+    {
+        $englishWords = ['the', 'and', 'you', 'can', 'use', 'this', 'that', 'with', 'for', 'are', 'is', 'in', 'to', 'of'];
+        $spanishWords = ['el', 'la', 'y', 'puedes', 'usar', 'esto', 'eso', 'con', 'para', 'son', 'es', 'en', 'de', 'que'];
+        
+        $englishCount = 0;
+        $spanishCount = 0;
+        $words = str_word_count(strtolower($text), 1);
+        
+        foreach ($words as $word) {
+            if (in_array($word, $englishWords)) {
+                $englishCount++;
+            }
+            if (in_array($word, $spanishWords)) {
+                $spanishCount++;
+            }
+        }
+        
+        // Si hay más palabras en inglés que en español, considerar que está en inglés
+        return $englishCount > $spanishCount && $englishCount > 2;
     }
 }

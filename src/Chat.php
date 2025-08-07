@@ -22,7 +22,7 @@ class Chat
                 break;
             }
 
-            $response = $this->aiService->getResponse($input);
+            $response = $this->getResponse($input);
             
             $this->displayResponse($response);
         }
@@ -47,5 +47,10 @@ class Chat
     private function prompt(): ?string
     {
         return readline('> ');
+    }
+
+    public function getResponse($input): string
+    {
+        return $this->aiService->getResponse($input);
     }
 }
