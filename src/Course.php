@@ -1,8 +1,8 @@
 <?php
 
-require 'CourseType.php';
+namespace App;
 
-class CourseDos {
+class Course {
 
     public function __construct(
         protected string $title, 

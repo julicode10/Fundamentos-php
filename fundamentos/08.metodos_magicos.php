@@ -1,8 +1,8 @@
 <?php
  
-require 'CourseDos.php';
+require '../src/Course.php';
 
-$course = new CourseDos(
+$course = new Course(
         title: "Curso profesional de PHP",
         subtitle: "Aprende PHP desde cero",
         description: "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Quasi atque quos, rerum ullam quae placeat accusamus eaque incidunt, impedit sit quia repellat magnam consequuntur illum quisquam optio illo. Recusandae, cumque.",
