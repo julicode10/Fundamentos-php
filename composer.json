@@ -3,5 +3,8 @@
         "psr-4": {
             "App\\": "src/"
         }
+    },
+    "require": {
+        "ardagnsrn/ollama-php": "^1.0"
     }
 }

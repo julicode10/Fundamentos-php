@@ -1,6 +1,11 @@
 #!/usr/bin/env php
 <?php
 
+require __DIR__ . '/../vendor/autoload.php';
+
+//$aiService = App\new FakeAiService();
+$aiService = new App\OllamaAiService();
+
 echo 'Ask anything to AI'. PHP_EOL;
 
 while (true) {
@@ -10,9 +15,6 @@ while (true) {
         break;
     }
 
-    echo 'Thinking...' . PHP_EOL;
-
-    sleep(2); // Simulate thinking time
-
-    echo 'AI: ' . $input . PHP_EOL;
+    $response = $aiService->getResponse($input);
+    echo $response . PHP_EOL;
 }
