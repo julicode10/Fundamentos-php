@@ -15,14 +15,22 @@ class OllamaAiService
 
     public function getResponse(string $question): string
     {
-        $result = $this->client->chat()
-            ->create([
-                'model' => 'deepseek-r1:1.5b',
-                'messages' => [
-                    ['role' => 'user', 'content' => $question],
-                ]
-            ]);
+        try {
+            $result = $this->client->chat()
+                ->create([
+                    'model' => 'deepseek-r1:1.5b',
+                    'messages' => [
+                        ['role' => 'user', 'content' => $question],
+                    ]
+                ]);
+            
+            return $result->message->content ?? 'No response from AI.';
+            
+        } catch (\Exception $e) {
+            
+            // Retornar un mensaje de error amigable al usuario
+            return 'Lo siento, hubo un error al procesar tu consulta. Por favor, inténtalo nuevamente. Error: ' . $e->getMessage();
+        }
         
-        return $result->message->content;
     }
 }

@@ -5,6 +5,12 @@
         }
     },
     "require": {
-        "ardagnsrn/ollama-php": "^1.0"
+        "ardagnsrn/ollama-php": "^1.0",
+        "openai-php/client": "^0.15.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
     }
 }
